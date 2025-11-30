@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:background="#101014"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/textTitle"
+        android:text="Modo práctica"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <!-- 🚨 NUEVO BOTÓN PARA CONECTAR SMARTSHOE -->
+    <Button
+        android:id="@+id/btnConnectSmartShoe"
+        android:text="Conectar SmartShoe"
+        android:background="#303040"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="16dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <!-- ZONA DE ZAPATOS (igual que la tuya) -->
+    <LinearLayout
+        android:id="@+id/layoutShoes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <!-- Zapato A -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <View
+                android:id="@+id/viewShoeA"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:background="#FF4444" />
+
+            <TextView
+                android:id="@+id/textBeatA"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="A: -"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <!-- Zapato B -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <View
+                android:id="@+id/viewShoeB"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:background="#4444FF" />
+
+            <TextView
+                android:id="@+id/textBeatB"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="B: -"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Lista tipo Spotify -->
+    <ListView
+        android:id="@+id/listSongs"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <Button
+            android:id="@+id/btnStartPractice"
+            android:text="Start"
+            android:layout_marginEnd="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btnStopPractice"
+            android:text="Stop"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:background="#101319"
+    android:padding="16dp">
+
+    <!-- BOTÓN ATRÁS + TÍTULO CANCION -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
+
+        <ImageView
+            android:id="@+id/buttonBackPractice"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="4dp"
+            android:src="@android:drawable/ic_media_previous"
+            app:tint="@android:color/white" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="8dp">
+
+            <TextView
+                android:id="@+id/textSongTitleSession"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Título"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/textSongArtistSession"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Artista"
+                android:textColor="#B0BEC5"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- IMAGEN / AVATAR -->
+    <ImageView
+        android:id="@+id/imageAvatar"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_gravity="center_horizontal"
+        android:src="@android:drawable/ic_media_play"
+        app:tint="#3949AB"
+        android:layout_marginBottom="16dp" />
+
+    <!-- BPM -->
+    <TextView
+        android:id="@+id/textSongBpmSession"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="BPM: --"
+        android:textColor="#81D4FA"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="24dp" />
+    <View
+        android:id="@+id/viewBeat"
+        android:layout_width="70dp"
+        android:layout_height="70dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/beat_circle" />
+
+
+    <!-- BOTONES DE CONTROL -->
+    <Button
+        android:id="@+id/buttonStartPractice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Iniciar práctica"
+        android:textAllCaps="false"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:backgroundTint="#00897B"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/buttonStopPractice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Detener"
+        android:textAllCaps="false"
+        android:backgroundTint="#D32F2F"
+        android:textColor="@android:color/white"
+        android:textSize="16sp" />
+
+</LinearLayout>
