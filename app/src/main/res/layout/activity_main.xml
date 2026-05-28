@@ -177,7 +177,14 @@
                 android:id="@+id/btnScan"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Escanear dispositivos BLE"
+                android:text="Buscar y enlazar zapato A"
+                android:backgroundTint="#3949AB"
+                android:textColor="@android:color/white" />
+            <Button
+                android:id="@+id/btnScanB"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Buscar y enlazar zapato B"
                 android:backgroundTint="#3949AB"
                 android:textColor="@android:color/white" />
         </LinearLayout>

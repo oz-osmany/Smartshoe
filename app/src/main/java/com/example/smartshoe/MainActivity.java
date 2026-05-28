@@ -6,16 +6,22 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
-import android.content.Intent;     // 👈 IMPORTANTE
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
@@ -30,15 +36,29 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
-// 👇 Esto le dice al analizador: "yo me encargo de los permisos en tiempo de ejecución"
 @SuppressLint("MissingPermission")
 public class MainActivity extends AppCompatActivity {
 
+
+
     private static final int REQUEST_PERMISSIONS = 1001;
+
+    // UUIDs de tu ESP32 (Nordic UART)
+    private static final UUID SHOE_SERVICE_UUID =
+            UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e");
+    private static final UUID SHOE_CHARACTERISTIC_UUID =
+            UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e");
 
     private Button btnOpenProfile;
     private Button btnScan;
+    private Button btnScanB;
+    private enum PairingTarget {
+        A, B
+    }
+
+    private PairingTarget currentPairingTarget = PairingTarget.A;
     private Button buttonPracticeMode;
     private TextView tvStatus;
     private ListView lvDevices;
@@ -47,40 +67,45 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothLeScanner bluetoothLeScanner;
     private BluetoothGatt bluetoothGatt;
 
-    // Lista de texto que se muestra
     private final List<String> deviceDisplayList = new ArrayList<>();
+    private BleShoeManager bleShoeManager;
+    private final Handler scanHandler = new Handler(Looper.getMainLooper());
+    private final Runnable stopScanRunnable = () -> {
+        if (bleShoeManager != null) {
+            bleShoeManager.stopScan();
+        }
+    };
+    private final Map<String, BluetoothDevice> displayToDeviceMap = new HashMap<>();
     private ArrayAdapter<String> devicesAdapter;
 
-    // Map: línea de texto -> dirección MAC real
-    private final Map<String, String> displayToAddressMap = new HashMap<>();
+    private BluetoothDevice pendingDeviceToPair;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);   // <- usa tu activity_main.xml
+        setContentView(R.layout.activity_main);
 
-        // 1) Referencias a la UI
         btnOpenProfile = findViewById(R.id.btnOpenProfile);
         btnScan = findViewById(R.id.btnScan);
+        btnScanB = findViewById(R.id.btnScanB);
         buttonPracticeMode = findViewById(R.id.buttonPracticeMode);
         tvStatus = findViewById(R.id.tvStatus);
         lvDevices = findViewById(R.id.lvDevices);
 
-        // 2) Botón para abrir la pantalla de Perfil
         btnOpenProfile.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, ProfileActivity.class);
             startActivity(intent);
         });
-        buttonPracticeMode.setOnClickListener(v -> {
-            // para probar si llega aquí:
-            // Toast.makeText(MainActivity.this, "Click en Modo Práctica", Toast.LENGTH_SHORT).show();
 
+        buttonPracticeMode.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity.this, PracticeActivity.class);
             startActivity(intent);
         });
-        // 3) Inicializar Bluetooth
+
         BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+
         if (bluetoothManager != null) {
             bluetoothAdapter = bluetoothManager.getAdapter();
         }
@@ -93,7 +118,6 @@ public class MainActivity extends AppCompatActivity {
 
         bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
 
-        // 4) Adapter para la lista
         devicesAdapter = new ArrayAdapter<>(
                 this,
                 android.R.layout.simple_list_item_1,
@@ -101,26 +125,103 @@ public class MainActivity extends AppCompatActivity {
         );
         lvDevices.setAdapter(devicesAdapter);
 
-        // 5) Click en un dispositivo de la lista -> conectarse
         lvDevices.setOnItemClickListener((parent, view, position, id) -> {
             String display = deviceDisplayList.get(position);
-            String address = displayToAddressMap.get(display);
-            if (address != null) {
-                connectToDevice(address);
-            }
-        });
+            BluetoothDevice device = displayToDeviceMap.get(display);
 
-        // 6) Botón de escaneo
-        btnScan.setOnClickListener(view -> {
-            if (!hasBlePermissions()) {
-                requestBlePermissions();
+            if (device == null) {
+                tvStatus.setText("No pude recuperar el dispositivo seleccionado.");
+                return;
+            }
+
+            scanHandler.removeCallbacks(stopScanRunnable);
+
+            if (bleShoeManager != null) {
+                bleShoeManager.stopScan();
+            }
+
+            if (currentPairingTarget == PairingTarget.A) {
+                bleShoeManager.connectAndSaveAsShoeA(this, device);
             } else {
-                startScan();
+                bleShoeManager.connectAndSaveAsShoeB(this, device);
             }
         });
-    }
 
-    // ===== PERMISOS =====
+        btnScan.setOnClickListener(view -> {
+            currentPairingTarget = PairingTarget.A;
+            startBleScanForPairing();
+        });
+
+        btnScanB.setOnClickListener(view -> {
+            currentPairingTarget = PairingTarget.B;
+            startBleScanForPairing();
+        });
+        bleShoeManager = new BleShoeManager(this, new BleShoeManager.Listener() {
+            @Override
+            public void onStatus(String message) {
+                tvStatus.setText(message);
+            }
+
+            @Override
+            public void onDeviceFound(BluetoothDevice device, String displayText) {
+                if (!displayToDeviceMap.containsKey(displayText)) {
+                    displayToDeviceMap.put(displayText, device);
+                    deviceDisplayList.add(displayText);
+                    devicesAdapter.notifyDataSetChanged();
+                }
+            }
+
+            @Override
+            public void onShoeAReady(ShoeDevice shoeDevice) {
+                tvStatus.setText("Zapato A enlazado: " + shoeDevice.getName());
+            }
+
+            @Override
+            public void onShoeBReady(ShoeDevice shoeDevice) {
+                tvStatus.setText("Zapato B enlazado: " + shoeDevice.getName());
+            }
+
+            @Override
+            public void onError(String message) {
+                tvStatus.setText(message);
+            }
+        });
+
+        showSavedShoeInfo();
+    }
+    private void startBleScanForPairing() {
+        if (!bleShoeManager.hasScanPermission(this) ||
+                !bleShoeManager.hasConnectPermission(this)) {
+
+            bleShoeManager.requestBlePermissions(this, REQUEST_PERMISSIONS);
+
+        } else {
+            deviceDisplayList.clear();
+            displayToDeviceMap.clear();
+            devicesAdapter.notifyDataSetChanged();
+
+            String targetText = currentPairingTarget == PairingTarget.A
+                    ? "zapato A"
+                    : "zapato B";
+
+            tvStatus.setText("Buscando " + targetText + "...");
+
+            bleShoeManager.startScan(this);
+            scanHandler.removeCallbacks(stopScanRunnable);
+            scanHandler.postDelayed(stopScanRunnable, 15000);
+        }
+    }
+    private void showSavedShoeInfo() {
+        SharedPreferences prefs = getSharedPreferences("user_profile", MODE_PRIVATE);
+        String leftName = prefs.getString("leftShoeName", null);
+        String leftId = prefs.getString("leftShoeId", null);
+
+        if (leftId != null) {
+            tvStatus.setText("Zapato A guardado: " + leftName + " (" + leftId + ")");
+        } else {
+            tvStatus.setText("Aún no hay un zapato A enlazado.");
+        }
+    }
 
     private String[] getRequiredPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -177,14 +278,12 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (allGranted) {
-                startScan();
+                startBleScanForPairing();
             } else {
                 tvStatus.setText("Permisos denegados. No puedo escanear.");
             }
         }
     }
-
-    // ===== ESCANEO =====
 
     private void startScan() {
         if (!hasBlePermissions()) {
@@ -198,9 +297,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        tvStatus.setText("Escaneando dispositivos BLE...");
+        tvStatus.setText("Buscando dispositivos BLE para enlazar zapato A...");
         deviceDisplayList.clear();
-        displayToAddressMap.clear();
+        displayToDeviceMap.clear();
         devicesAdapter.notifyDataSetChanged();
 
         if (bluetoothLeScanner == null) {
@@ -219,8 +318,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Detener el escaneo después de 20 segundos
-        tvStatus.postDelayed(this::stopScan, 20_000);
+        tvStatus.postDelayed(this::stopScan, 15000);
     }
 
     private void stopScan() {
@@ -241,20 +339,22 @@ public class MainActivity extends AppCompatActivity {
 
             if (result == null || result.getDevice() == null) return;
 
-            String name = result.getDevice().getName();
-            String address = result.getDevice().getAddress();
+            BluetoothDevice device = result.getDevice();
+            String name = device.getName();
+            String address = device.getAddress();
 
-            if (name == null || name.isEmpty()) {
+            if (name == null || name.trim().isEmpty()) {
                 name = "Sin nombre";
             }
-            if (address == null) {
+
+            if (address == null || address.trim().isEmpty()) {
                 return;
             }
 
             String display = name + " (" + address + ")";
 
-            if (!displayToAddressMap.containsKey(display)) {
-                displayToAddressMap.put(display, address);
+            if (!displayToDeviceMap.containsKey(display)) {
+                displayToDeviceMap.put(display, device);
                 deviceDisplayList.add(display);
                 devicesAdapter.notifyDataSetChanged();
             }
@@ -272,26 +372,26 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onScanFailed(int errorCode) {
             super.onScanFailed(errorCode);
-            tvStatus.append("\nError de escaneo: " + errorCode);
+            tvStatus.setText("Error de escaneo: " + errorCode);
         }
     };
 
-    // ===== CONEXIÓN GATT =====
-
-    private void connectToDevice(String address) {
+    private void connectToDevice(BluetoothDevice device) {
         if (!hasBlePermissions()) {
             tvStatus.setText("No tengo permisos BLE para conectar.");
             requestBlePermissions();
             return;
         }
 
-        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
         if (device == null) {
-            tvStatus.setText("No se pudo obtener el dispositivo para conectar.");
+            tvStatus.setText("Dispositivo inválido.");
             return;
         }
 
-        tvStatus.setText("Conectando a " + address + "...");
+        String name = device.getName() != null ? device.getName() : "Sin nombre";
+        String address = device.getAddress();
+
+        tvStatus.setText("Conectando a " + name + " (" + address + ")...");
 
         if (bluetoothGatt != null) {
             bluetoothGatt.close();
@@ -307,42 +407,81 @@ public class MainActivity extends AppCompatActivity {
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
-        public void onConnectionStateChange(
-                BluetoothGatt gatt,
-                int status,
-                int newState
-        ) {
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             super.onConnectionStateChange(gatt, status, newState);
+
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                runOnUiThread(() ->
+                        tvStatus.setText("Falló la conexión GATT. status=" + status));
+                gatt.close();
+                return;
+            }
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 runOnUiThread(() -> tvStatus.setText("Conectado. Descubriendo servicios..."));
                 gatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                runOnUiThread(() -> tvStatus.setText("Desconectado del dispositivo."));
+                runOnUiThread(() -> tvStatus.setText("Dispositivo desconectado."));
             }
         }
 
         @Override
-        public void onServicesDiscovered(
-                BluetoothGatt gatt,
-                int status
-        ) {
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             super.onServicesDiscovered(gatt, status);
 
-            runOnUiThread(() -> tvStatus.setText(
-                    "Servicios descubiertos. Listo para enviar comandos (cuando definamos UUIDs)."
-            ));
-            // Aquí después buscaremos el service/characteristic para el zapato.
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                runOnUiThread(() ->
+                        tvStatus.setText("Error descubriendo servicios. status=" + status));
+                return;
+            }
+
+            BluetoothGattService service = gatt.getService(SHOE_SERVICE_UUID);
+            if (service == null) {
+                runOnUiThread(() ->
+                        tvStatus.setText("El dispositivo no tiene el servicio del zapato."));
+                return;
+            }
+
+            BluetoothGattCharacteristic characteristic =
+                    service.getCharacteristic(SHOE_CHARACTERISTIC_UUID);
+
+            if (characteristic == null) {
+                runOnUiThread(() ->
+                        tvStatus.setText("El dispositivo no tiene la característica de control."));
+                return;
+            }
+
+            if (pendingDeviceToPair != null) {
+                saveDeviceAsShoeA(pendingDeviceToPair);
+                String name = pendingDeviceToPair.getName() != null
+                        ? pendingDeviceToPair.getName()
+                        : "Sin nombre";
+
+                runOnUiThread(() ->
+                        tvStatus.setText("Zapato A enlazado correctamente: " + name));
+            } else {
+                runOnUiThread(() ->
+                        tvStatus.setText("Servicio encontrado, pero no había dispositivo pendiente."));
+            }
         }
     };
+
+    private void saveDeviceAsShoeA(BluetoothDevice device) {
+        SharedPreferences prefs = getSharedPreferences("user_profile", MODE_PRIVATE);
+        prefs.edit()
+                .putString("leftShoeId", device.getAddress())
+                .putString("leftShoeName", device.getName() != null ? device.getName() : "Sin nombre")
+                .apply();
+    }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        stopScan();
-        if (bluetoothGatt != null) {
-            bluetoothGatt.close();
-            bluetoothGatt = null;
+
+        scanHandler.removeCallbacks(stopScanRunnable);
+
+        if (bleShoeManager != null) {
+            bleShoeManager.stopScan();
         }
     }
 }

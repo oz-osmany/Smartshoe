@@ -16,15 +16,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
-    <!-- 🚨 NUEVO BOTÓN PARA CONECTAR SMARTSHOE -->
-    <Button
-        android:id="@+id/btnConnectSmartShoe"
-        android:text="Conectar SmartShoe"
-        android:background="#303040"
-        android:textColor="#FFFFFF"
-        android:layout_marginBottom="16dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
 
     <!-- ZONA DE ZAPATOS (igual que la tuya) -->
     <LinearLayout
@@ -100,8 +91,39 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
+        <RadioGroup
+            android:id="@+id/radioGroupStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/radioSalsa"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Salsa"
+                android:checked="true"/>
+
+            <RadioButton
+                android:id="@+id/radioSon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Son"/>
+        </RadioGroup>
+
+
+
+    </LinearLayout>
+    <LinearLayout
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
         <Button
             android:id="@+id/btnStartPractice"
+
+
             android:text="Start"
             android:layout_marginEnd="8dp"
             android:layout_width="wrap_content"
